@@ -40,7 +40,7 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       CidrBlock: 10.0.0.0/18
-      MapPublicIpOnLaunch: true <3>
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Ref AWS::StackName
@@ -135,7 +135,46 @@ Resources:
       LoadBalancerArn: !Ref LoadBalancer
       Port: 80
       Protocol: HTTP
-
+  ScalingGroup:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: "1"
+        MaxBatchSize: "1"
+        PauseTime: "PT15M"
+        WaitOnResourceSignals: "true"
+        SuspendProcesses:
+          - HealthCheck
+          - ReplaceUnhealthy
+          - AZRebalance
+          - AlarmNotification
+          - ScheduledActions
+    Properties:
+      AutoScalingGroupName: !Sub 'ASG_${AWS::StackName}'
+      AvailabilityZones:
+        - !GetAtt SubnetAZ1.AvailabilityZone
+        - !GetAtt SubnetAZ2.AvailabilityZone
+      MinSize: 2
+      MaxSize: 6
+      HealthCheckGracePeriod: 0
+      HealthCheckType: ELB
+      LaunchTemplate:
+        LaunchTemplateId: !Ref InstanceLaunchTemplate
+        Version: !GetAtt InstanceLaunchTemplate.LatestVersionNumber
+      TargetGroupARNs:
+        - !Ref LoadBalancerTargetGroup
+      MetricsCollection:
+        - Granularity: "1Minute"
+          Metrics:
+            - "GroupMaxSize"
+            - "GroupInServiceInstances"
+      VPCZoneIdentifier:
+        - !Ref SubnetAZ1
+        - !Ref SubnetAZ2
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+          PropagateAtLaunch: "true"
   SecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
     Properties:
@@ -338,6 +377,8 @@ Resources:
       - Instance2
     Properties:
       DeploymentGroupName: staging
+      AutoScalingGroups:
+        - !Ref ScalingGroup
       ApplicationName: !Ref DeploymentApplication
       DeploymentConfigName: CodeDeployDefault.AllAtOnce
       ServiceRoleArn: !GetAtt DeploymentRole.Arn
