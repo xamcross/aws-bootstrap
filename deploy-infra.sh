@@ -10,6 +10,7 @@ AWS_ACCOUNT_ID=`aws sts get-caller-identity --profile awsbootstrap \
 CODEPIPELINE_BUCKET="$STACK_NAME-$REGION-codepipeline-$AWS_ACCOUNT_ID"
 CFN_BUCKET="$STACK_NAME-cfn-$AWS_ACCOUNT_ID"
 DOMAIN=vizitochka.net
+CERT=`aws acm list-certificates --region $REGION --profile awsbootstrap --output text --query "CertificateSummaryList[?DomainName=='$DOMAIN'].CertificateArn | [0]"`
 
 EC2_INSTANCE_TYPE=t2.micro
 
@@ -59,6 +60,7 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
     Domain=$DOMAIN \
+    Certificate=$CERT \
     EC2InstanceType=$EC2_INSTANCE_TYPE \
     GitHubOwner=$GH_OWNER \
     GitHubRepo=$GH_REPO \
